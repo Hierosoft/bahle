@@ -25,7 +25,8 @@ requires-python = ">=3.6"
 authors = [
     {name="Cheaterman", email="the.cheaterman@gmail.com"},
 ]
-license = { file = "LICENSE" }
+# license = { file = "LICENSE", text = "MIT License" }
+# ^ since license is specified in classifiers, license field is commented as per <https://packaging.python.org/en/latest/guides/writing-pyproject-toml/>
 keywords = ["basic", "sly", "lexer", "parser", "interpreter", "qbasic"]
 classifiers = [
   # How mature is this project? Common values are
