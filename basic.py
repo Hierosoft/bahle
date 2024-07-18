@@ -1,5 +1,5 @@
 import collections
-import math
+from decimal import Decimal
 
 from sly.lex import Lexer, Token
 from sly.yacc import Parser
@@ -30,6 +30,8 @@ class BasicLexer(Lexer):
         DIVIDE,
         EQUALS,
         COLON,
+        LPAREN,
+        RPAREN
     }
 
     ignore = ' '
@@ -40,6 +42,8 @@ class BasicLexer(Lexer):
     DIVIDE = r'/'
     EQUALS = r'='
     COLON = r':'
+    LPAREN = r'\('
+    RPAREN = r'\)'
 
     REM = r"(?:REM|').*"
     PRINT = r'PRINT'
@@ -58,13 +62,10 @@ class BasicLexer(Lexer):
             self.index
             and self.text[:token.index] != token.index * ' '
         ):
-            float_value = float(token.value)
-            int_value = int(float_value)
-            token.value = (
-                int_value
-                if math.isclose(int_value, float_value)
-                else float_value
-            )
+            if '.' not in token.value:
+                token.value = (int(token.value))
+            else:
+                token.value = (Decimal(token.value))
 
         else:
             if '.' not in token.value:
@@ -202,6 +203,10 @@ class BasicParser(Parser):
     def expr(self, parsed):
         return Expression('negative', [parsed.expr])
 
+    @_('LPAREN expr RPAREN')
+    def expr(self, parsed):
+        return parsed.expr
+
     @_('expr PLUS expr')
     def expr(self, parsed):
         return Expression('add', [parsed.expr0, parsed.expr1])
@@ -306,14 +311,6 @@ class BasicInterpreter:
 
         if isinstance(node, Expression):
             return_value = self.execute(*node)
-
-        if isinstance(return_value, float):
-            int_return_value = int(return_value)
-            return_value = (
-                int_return_value
-                if math.isclose(int_return_value, return_value)
-                else return_value
-            )
 
         return return_value
 
