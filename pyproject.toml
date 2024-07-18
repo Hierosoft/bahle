@@ -2,17 +2,30 @@
 requires = ["setuptools", "wheel"]
 build-backend = "setuptools.build_meta"
 
+[tool.setuptools]
+py-modules = ["basic"]
+# ^ If py-modules is not specified, setuptools will attempt auto-discovery.
+
 [project]
 name = "basic"
 version = "0.3.0"
 description = "A small BASIC interpreter written in Python using SLY."
-authors = [
-    {name="Cheaterman", email="the.cheaterman@gmail.com"},
-]
 dependencies = [
   "sly",
 ]
-requires-python = ">= 3.6"
+requires-python = ">=3.6"
+# ^ latest 3.6 is 3.6.15 (partial support until 2021)
+# NOTE: vscode requires 3.8 for TypeDict (for use vy vscode_pytest extension)
+# otherwise: "  .../.vscode/extensions/ms-python.python-2024.10.0-linux-x64/python_files/vscode_pytest/__init__.py", line 18, in <module>
+#    from typing import (  # noqa: E402
+# ImportError: Error importing plugin "vscode_pytest": cannot import name 'TypedDict'"
+# ^ latest 3.8 is 3.8.19 as of July 2024 ("Source-only security fix releases
+#   Provided irregularly on an “as-needed” basis until October 2024.")
+
+authors = [
+    {name="Cheaterman", email="the.cheaterman@gmail.com"},
+]
+license = { file = "LICENSE" }
 keywords = ["basic", "sly", "lexer", "parser", "interpreter", "qbasic"]
 classifiers = [
   # How mature is this project? Common values are
@@ -23,7 +36,8 @@ classifiers = [
 
   # Indicate who your project is intended for
   "Intended Audience :: Developers",
-  "Topic :: Software Development :: Build Tools",
+  "Topic :: Software Development",
+  "Topic :: Software Development :: Interpreters",
 
   # Pick your license as you wish (see also "license" above)
   "License :: OSI Approved :: MIT License",
@@ -36,6 +50,10 @@ classifiers = [
   "Programming Language :: Python :: 3.9",
   "Programming Language :: Python :: 3.10",
 ]
+
+[project.urls]
+homepage = "https://github.com/Cheaterman/basic"
+repository = "https://github.com/Cheaterman/basic"
 
 [project.optional-dependencies]
 dev = [
