@@ -8,7 +8,8 @@ py-modules = ["basic"]
 
 [project]
 name = "basic"
-version = "0.3.0"
+version = "0.1.0"
+# ^ version: See also main.py
 description = "A small BASIC interpreter written in Python using SLY."
 dependencies = [
   "sly",
