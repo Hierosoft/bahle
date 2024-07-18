@@ -1,7 +1,9 @@
+import sys
+
 from basic import BasicInterpreter
 
 
-if __name__ == '__main__':
+def main_interactive():
     print("Cman's simple BASIC v0.1")
     print('2019 Cheaterman')
 
@@ -41,3 +43,8 @@ if __name__ == '__main__':
                 print(f'Break in {interpreter.last_program_lineno}')
 
     print('Bye!')
+    return 0
+
+
+if __name__ == '__main__':
+    sys.exit(main_interactive())
