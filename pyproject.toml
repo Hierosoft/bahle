@@ -27,6 +27,7 @@ authors = [
 ]
 # license = { file = "LICENSE", text = "MIT License" }
 # ^ since license is specified in classifiers, license field is commented as per <https://packaging.python.org/en/latest/guides/writing-pyproject-toml/>
+readme = "README.md"
 keywords = ["basic", "sly", "lexer", "parser", "interpreter", "qbasic"]
 classifiers = [
   # How mature is this project? Common values are
@@ -54,10 +55,18 @@ classifiers = [
 
 [project.urls]
 homepage = "https://github.com/Cheaterman/basic"
-repository = "https://github.com/Cheaterman/basic"
+repository = "https://github.com/Cheaterman/basic.git"
+"Bug Tracker" = "https://github.com/Cheaterman/basic/issues"
+# Changelog = "https://github.com/Cheaterman/basic/blob/master/CHANGELOG.md"
 
 [project.optional-dependencies]
 dev = [
     "pytest",
     "pytest-cov"
 ]
+
+# [project.scripts]
+# basic = "basic:main"
+
+# [project.gui-scripts]
+# basic-gui = "basic:main_gui"
