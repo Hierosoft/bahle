@@ -54,9 +54,10 @@ classifiers = [
 ]
 
 [project.urls]
-homepage = "https://github.com/Cheaterman/basic"
-repository = "https://github.com/Cheaterman/basic.git"
-"Bug Tracker" = "https://github.com/Cheaterman/basic/issues"
+Homepage = "https://github.com/Cheaterman/basic"
+Documentation = "https://github.com/Cheaterman/basic/README.md"
+Repository = "https://github.com/Cheaterman/basic.git"
+Issues = "https://github.com/Cheaterman/basic/issues"
 # Changelog = "https://github.com/Cheaterman/basic/blob/master/CHANGELOG.md"
 
 [project.optional-dependencies]
