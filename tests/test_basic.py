@@ -330,9 +330,9 @@ def test_conditionals(capsys, interpreter, expected_output):
         # ('PRINT 0.1 + 0.2', '0.3'),  # TODO: re-add this after
         #   changing to bit-for-bit parity with BASIC (using numpy floats)
         # region cb7a5a4 (Add support for ( and ) in expressions)
-        ('PRINT (0.1 + 0.2) * 2', '0.6'),
+        ('PRINT (0.1 + 0.2) * 2', '0.6000000000000001'),  # 0.6000000000000001 float, 0.6 decimal
         ('PRINT (0.1 * 0.2) + 2', '2.02'),
-        ('PRINT ((0.1 * 0.2) + (0.24 * 2))', '0.50'),
+        ('PRINT ((0.1 * 0.2) + (0.24 * 2))', '0.5'), # .5 float, .50 decimal
         # endregion cb7a5a4 (Add support for ( and ) in expressions)
     )
 )
