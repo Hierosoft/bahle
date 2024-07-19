@@ -1,5 +1,6 @@
 import collections
 import math
+import sys
 
 from sly.lex import Lexer, Token
 from sly.yacc import Parser
@@ -15,6 +16,7 @@ class BasicLexer(Lexer):
         ID,
         REM,
         PRINT,
+        FLUSH,
         IF,
         THEN,
         ELSE,
@@ -37,6 +39,7 @@ class BasicLexer(Lexer):
 
     ignore = ' '
 
+    FLUSH = r";"
     PLUS = r'\+'
     MINUS = r'-'
     MULTIPLY = r'\*'
@@ -115,6 +118,7 @@ class BasicParser(Parser):
         ('left', COLON),
         ('nonassoc', ELSE),
         ('left', EQUALS),
+        ('nonassoc', FLUSH),
         ('left', CREATE_EXPRS, APPEND_EXPRS),
         ('left', PLUS, MINUS),
         ('left', MULTIPLY, DIVIDE),
@@ -240,6 +244,17 @@ class BasicParser(Parser):
     def expr(self, parsed):
         return parsed[0]
 
+    @_('FLUSH')
+    def expr(self, parsed):
+        # return Statement('flush', [])
+        # TODO: low-priority: Actual BASIC would previous PRINT args first
+        #   but returning a Statement here causes it to show.
+        #   - Add a new class and return an instance?
+        #   - Either way it would require alternating between
+        #     sys.stdout.flush() and sys.stdout.write(...) then a
+        #     newline and an auto flush at the end of the line.
+        return ""
+
     @_('variable')
     def expr(self, parsed):
         return Expression('get_variable', [parsed.variable.name])
@@ -358,6 +373,10 @@ class BasicInterpreter:
         # ** uses the object's own method, such as if
         #    __pow__(), __rpow__() or __ipow__() are overridden.
         return a ** b
+
+    # def flush(self):
+    #     # TODO: low-pri: Actual BASIC would previous PRINT args first
+    #     sys.stdout.flush()
 
     def get_variable(self, name):
         return self.variables.get(name, 0)

@@ -169,6 +169,14 @@ def lexer():
             ('PRINT', 'PRINT'),
             ('ID', 'B'),
         )),
+        ('PRINT B; A + C', (
+            ('PRINT', 'PRINT'),
+            ('ID', 'B'),
+            ('FLUSH', ';'),
+            ('ID', 'A'),
+            ('PLUS', '+'),
+            ('ID', 'C'),
+        )),
     ),
 )
 def test_lexer(lexer, test_string, expected_tokens):
@@ -281,6 +289,9 @@ def test_interpreter_list(capsys, interpreter, expected_output):
         (('A = 3', 'PRINTA=3'), '-1'),
         ('PRINT"A"', 'A'),
         (('A = 3', 'PRINT"A"A'), 'A 3'),
+        (('PRINT "B"'), 'B'),
+        (('PRINT "B"; "B"'), 'B  B'),  # FIXME: should only have 1 space
+        (('A = 2: B = 3', 'PRINT "B"; A + B'), 'B  5'),  # FIXME: should only have 1 space
     )
 )
 def test_print_output(capsys, interpreter, expected_output):
