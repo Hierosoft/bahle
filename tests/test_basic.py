@@ -219,6 +219,67 @@ def test_interpreter_assignment(interpreter):
 def test_interpreter_simple_arithmetic(interpreter):
     assert interpreter.variables['A'] == 3
 
+@pytest.mark.parametrize('interpreter', indirect=True, argvalues=[(
+    'A% = 65536',  # 0
+    'A% = A% - 1',  # -1
+)])
+def test_interpreter_var_type_overflow(interpreter):
+    assert interpreter.variables['A%'] == -1
+
+@pytest.mark.parametrize('interpreter', indirect=True, argvalues=[(
+    'A% = 2.5',
+)])
+def test_interpreter_int16_bankers_rounding_down(interpreter):
+    assert interpreter.variables['A%'] == 2
+
+@pytest.mark.parametrize('interpreter', indirect=True, argvalues=[(
+    'A% = 3.5',
+)])
+def test_interpreter_int16_bankers_rounding_up(interpreter):
+    assert interpreter.variables['A%'] == 3
+    # FIXME: 4 in QB64pe 3.13.1 and Python, but not in numpy
+
+@pytest.mark.parametrize('interpreter', indirect=True, argvalues=[(
+    'A& = 2.5',
+)])
+def test_interpreter_int32_bankers_rounding_down(interpreter):
+    assert interpreter.variables['A&'] == 2
+
+@pytest.mark.parametrize('interpreter', indirect=True, argvalues=[(
+    'A& = 3.5',
+)])
+def test_interpreter_int32_bankers_rounding_up(interpreter):
+    assert interpreter.variables['A&'] == 3
+    # FIXME: 4 in QB64pe 3.13.1 and Python, but not in numpy
+
+import numpy as np
+
+@pytest.mark.parametrize('interpreter', indirect=True, argvalues=[(
+    'A! = 3.5',  # Single (float32)
+    'A% = 3.5',  # Integer (int16)
+)])
+def test_interpreter_type_suffix_redeclaration(interpreter):
+    assert interpreter.variables.get('A!') is None  # redefined as A%
+    assert interpreter.variables['A%'] == 3
+    # FIXME: 4 in QB64pe 3.13.1 and Python, but not in numpy
+    assert isinstance(interpreter.variables['A%'], np.int16)
+
+
+@pytest.mark.parametrize('interpreter', indirect=True, argvalues=[(
+    'A! = 0.4',  # QB Single (default type)
+)])
+def test_interpreter_float32_hides_CPU_inaccuracy(interpreter):
+    assert str(interpreter.variables['A!']) == "0.4"
+    assert isinstance(interpreter.variables['A!'], np.float32)
+
+@pytest.mark.parametrize('interpreter', indirect=True, argvalues=[(
+    'A# = 0.4',  # QB Double
+)])
+def test_interpreter_float64_hides_CPU_inaccuracy(interpreter):
+    assert interpreter.variables['A#'] == 0.4
+    assert isinstance(interpreter.variables['A#'], np.float64)
+
+# TODO: ensure "A$ = 1" causes: "Illegal string-number conversion"
 
 @pytest.mark.parametrize('interpreter', indirect=True, argvalues=[(
     'A = 3',

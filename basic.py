@@ -1,5 +1,6 @@
 import collections
 import math
+import numpy as np
 import sys
 
 from sly.lex import Lexer, Token
@@ -59,7 +60,8 @@ class BasicLexer(Lexer):
     RUN = r'RUN'
     GOTO = r'GOTO'
 
-    ID = r'[A-Za-z_][A-Za-z0-9_]*'
+    # ID = r'[A-Za-z_][A-Za-z0-9_]*'  # does not include type suffixes
+    ID = r'[a-zA-Z_][a-zA-Z0-9_]*[$%&!\#]*'  # includes type suffixes
 
     @_(r'(?:[0-9]+(?:\.[0-9]*)?|\.[0-9]+)')
     def NUMBER(self, token):
@@ -273,12 +275,27 @@ class BasicParser(Parser):
 
 
 class BasicInterpreter:
+    """The real-time state of the BASIC program.
+
+    Attributes:
+        typed_names (dict[str]): Key is variable name without suffix,
+            and value is name with suffix. If suffix is changed
+            (which is allowed in BASIC), the old variable name in the
+            value should be deleted from self.variables.
+    """
+    SUFFIX_TYPES = {
+        '%': np.int16,  # QB Integer
+        '&': np.int32,  # QB Long integer
+        '!': np.float32,  # QB Single
+        '#': np.float64,  # QB Double
+    }
     def __init__(self):
         self.lexer = BasicLexer()
         self.parser = BasicParser(self)
         self.variables = collections.defaultdict(int)
         self.program = {}
         self.running_program = False
+        self.typed_names = {}
 
     def interpret(self, line):
         try:
@@ -382,7 +399,48 @@ class BasicInterpreter:
         return self.variables.get(name, 0)
 
     def set_variable(self, name, value):
-        self.variables[name] = self.evaluate(value)
+        suffix = name[-1:]
+        suffix_type = BasicInterpreter.SUFFIX_TYPES.get(suffix)
+        # TODO: lookup type of variable (as set by `DEF*`` and `as *`)
+        if suffix_type:
+            # if name[-2:-1] in BasicInterpreter.CAST:
+            #     raise NotImplementedError(
+            #         "{} suffix is not implemented"
+            #         .format(name[2:]))
+            #     # TODO: implement more suffixes:
+            #     # <https://qb64.dijkens.com/wiki/Data_types.html#Data_type_limits>
+            # ^ More than 1 (allowed in BASIC) is already blocked by the
+            #   ID regex in Lexer
+            part0 = name.rstrip(name[-1:])
+            old_name = self.typed_names.get(part0)
+            if old_name is not None:
+                if old_name != name:
+                    # NOTE: QB allows type redefinition
+                    print("Warning: Overriding {} type with redeclaration {}"
+                          .format(old_name, name))
+                    del self.variables[old_name]
+                    self.typed_names[part0] = name
+            else:
+                self.typed_names[part0] = name
+            self.variables[name] = suffix_type(self.evaluate(value))
+            # ^ causes "DeprecationWarning: NumPy will stop allowing conversion of out-of-bound Python integers to integer arrays.  The conversion of 65536 to int16 will fail in the future.
+            #   For the old behavior, usually:
+            #       np.array(value).astype(dtype)`
+            #   will give the desired result (the cast overflows).
+            #     self.variables[name] = cast(self.evaluate(value))
+
+            # -- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html"
+            # Therefore:
+            # self.variables[name] = np.array(self.evaluate(value)).astype(suffix_type)
+            # FIXME: still causes:
+            # DeprecationWarning: NumPy will stop allowing conversion of out-of-bound Python integers to integer arrays.  The conversion of 65536 to int16 will fail in the future.
+            #   For the old behavior, usually:
+            #       np.array(value).astype(dtype)`
+            #   will give the desired result (the cast overflows).
+            #     self.variables[name] = suffix_type(self.evaluate(value))
+            # Maybe just require numpy <= 1.21.5 ...
+        else:
+            self.variables[name] = self.evaluate(value)
 
     def compare_variable(self, name, value):
         return -1 if self.variables[name] == value else 0
