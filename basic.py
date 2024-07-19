@@ -10,7 +10,7 @@ from sly.yacc import Parser
 Variable = collections.namedtuple('Variable', ['name'])
 Expression = collections.namedtuple('Expression', ['operation', 'arguments'])
 Statement = collections.namedtuple('Statement', ['operation', 'arguments'])
-
+ControlCharacter = collections.namedtuple('Statement', ['operation', 'arguments'])
 
 class BasicLexer(Lexer):
     tokens = {
@@ -67,17 +67,23 @@ class BasicLexer(Lexer):
     def NUMBER(self, token):
         if(
             self.index
-            and self.text[:token.index] != token.index * ' '
+            and self.text[:token.index].strip() != ""
         ):
-            float_value = float(token.value)
-            int_value = int(float_value)
+            # If it is *not* a line number
+            float_value = np.float64(token.value)
+            int_value = np.int32(float_value)
             token.value = (
                 int_value
-                if math.isclose(int_value, float_value)
+                if (np.float64(int_value) == float_value)  # math.isclose(int_value, float_value)
                 else float_value
             )
-
-        else:
+        else:  # LINENO
+            for part in token.value.split("."):
+                if not part.isdigit():
+                    raise SyntaxError(
+                        "{} special characters are not allowed in LINENO {}"
+                        .format(part, token.value)
+                    )
             if '.' not in token.value:
                 token.value = int(token.value)
 
@@ -250,14 +256,12 @@ class BasicParser(Parser):
 
     @_('FLUSH')
     def expr(self, parsed):
-        # return Statement('flush', [])
-        # TODO: low-priority: Actual BASIC would previous PRINT args first
-        #   but returning a Statement here causes it to show.
-        #   - Add a new class and return an instance?
-        #   - Either way it would require alternating between
-        #     sys.stdout.flush() and sys.stdout.write(...) then a
-        #     newline and an auto flush at the end of the line.
-        return ""
+        """Causes flushing previous PRINT args like BASIC.
+
+        Returns:
+            ControlCharacter: check for that type in def print in parser
+        """
+        return ControlCharacter('flush', [])
 
     @_('variable')
     def expr(self, parsed):
@@ -356,13 +360,13 @@ class BasicInterpreter:
         if isinstance(node, Expression):
             return_value = self.execute(*node)
 
-        if isinstance(return_value, float):
-            int_return_value = int(return_value)
-            return_value = (
-                int_return_value
-                if math.isclose(int_return_value, return_value)
-                else return_value
-            )
+        # if isinstance(return_value, (float, np.float32, np.float64)):
+        #     int_return_value = int(return_value)
+        #     return_value = (
+        #         int_return_value
+        #         if math.isclose(int_return_value, return_value)
+        #         else return_value
+        #     )
 
         return return_value
 
@@ -393,9 +397,9 @@ class BasicInterpreter:
         #    __pow__(), __rpow__() or __ipow__() are overridden.
         return a ** b
 
-    # def flush(self):
-    #     # TODO: low-pri: Actual BASIC would previous PRINT args first
-    #     sys.stdout.flush()
+    def flush(self):
+        # TODO: low-pri: Actual BASIC would previous PRINT args first
+        sys.stdout.flush()
 
     def get_variable(self, name):
         return self.variables.get(name, 0)
@@ -511,7 +515,47 @@ class BasicInterpreter:
         pass
 
     def print(self, *args):
-        print(*(self.evaluate(arg) for arg in args))
+        """Print with a space around numbers like BASIC.
+        There are no spaces around strings in BASIC.
+        """
+        # TODO: Make number formatting configurable (Only if BASIC has a way)
+        for arg in args:
+            if isinstance(arg, ControlCharacter):
+                if arg.operation == 'flush':
+                    sys.stdout.flush()
+                else:
+                    raise NotImplementedError(
+                        "Unknown ControlCharacter in print: {}({})"
+                        .format(type(arg).__name__, self.evaluate(arg))
+                    )
+            else:
+                value = self.evaluate(arg)
+                if isinstance(value, (np.float32, np.float64)):
+                    v_str = "{:7f}".format(value).rstrip("0.")
+                    # ^ deal with floating point arithmetic inaccuracy
+                    if value < 0:
+                        sys.stdout.write("{} ".format(v_str))
+                    else:
+                        sys.stdout.write(" {} ".format(v_str))
+                elif isinstance(value, (np.int16, np.int32)):
+                    if value < 0:
+                        sys.stdout.write("{} ".format(value))
+                    else:
+                        sys.stdout.write(" {} ".format(value))
+                elif isinstance(value, int):
+                    # Returns from comparison
+                    # Example: "B = 3: PRINT B = 3" (yields "-1 ")
+                    if value < 0:
+                        sys.stdout.write("{} ".format(value))
+                    else:
+                        sys.stdout.write(" {} ".format(value))
+                elif isinstance(value, float):
+                    raise NotImplementedError(
+                        "Numpy was skipped (got {}({}))"
+                        .format(type(value).__name__, value))
+                else:
+                    sys.stdout.write(value)
+        print("")
 
     def list(self):
         for lineno, line in sorted(self.program.items()):

@@ -288,7 +288,7 @@ def test_interpreter_float64_hides_CPU_inaccuracy(interpreter):
 # capsys goes first, otherwise parametrized interpreter output isn't captured
 def test_interpreter_print_variable(capsys, interpreter):
     captured = capsys.readouterr()
-    assert captured.out == '3\n'
+    assert captured.out == ' 3 \n'
 
 
 @pytest.mark.parametrize(
@@ -345,14 +345,15 @@ def test_interpreter_list(capsys, interpreter, expected_output):
     'interpreter, expected_output',
     indirect=['interpreter'],
     argvalues=(
-        ('PRINT 1 2 3', '1 2 3'),
-        (('A = 3', 'PRINT A = 3'), '-1'),
-        (('A = 3', 'PRINTA=3'), '-1'),
+        ('PRINT 1 2 3', ' 1  2  3 '),
+        (('A = 3', 'PRINT A = 3'), '-1 '),
+        (('A = 3', 'PRINTA=3'), '-1 '),
         ('PRINT"A"', 'A'),
-        (('A = 3', 'PRINT"A"A'), 'A 3'),
+        (('A = 3', 'PRINT"A"A'), 'A 3 '),
         (('PRINT "B"'), 'B'),
-        (('PRINT "B"; "B"'), 'B  B'),  # FIXME: should only have 1 space
-        (('A = 2: B = 3', 'PRINT "B"; A + B'), 'B  5'),  # FIXME: should only have 1 space
+        (('PRINT "B"; "B"'), 'BB'),
+        (('A = 2: B = 3', 'PRINT "B"; A + B'), 'B 5 '),
+        (('A = 2: B = 3', 'PRINT "B"; A - B'), 'B-1 '),
     )
 )
 def test_print_output(capsys, interpreter, expected_output):
@@ -363,6 +364,7 @@ def test_print_output(capsys, interpreter, expected_output):
 def test_rem_syntax_error(interpreter):
     with pytest.raises(SyntaxError):
         interpreter.interpret('PRINT"A"REM')
+
 
 def test_unterminated_string_syntax_error(interpreter):
     with pytest.raises(SyntaxError):
@@ -407,19 +409,19 @@ def test_conditionals(capsys, interpreter, expected_output):
 @pytest.mark.parametrize(
     'interpreter, expected_output',
     indirect=['interpreter'],
-    argvalues=(
-        ('PRINT 3 + 5 * -2', '-7'),
-        ('PRINT 3 - 4 * 5', '-17'),
-        ('PRINT 3 - 10 / 5', '1'),
+    argvalues=(  # Spaces should be present to mimic BASIC precisely:
+        ('PRINT 3 + 5 * -2', '-7 '),
+        ('PRINT 3 - 4 * 5', '-17 '),
+        ('PRINT 3 - 10 / 5', ' 1 '),
         # ('PRINT 0.1 + 0.2', '0.3'),  # TODO: re-add this after
         #   changing to bit-for-bit parity with BASIC (using numpy floats)
         # region cb7a5a4 (Add support for ( and ) in expressions)
-        ('PRINT (0.1 + 0.2) * 2', '0.6000000000000001'),  # 0.6000000000000001 float, 0.6 decimal
-        ('PRINT (0.1 * 0.2) + 2', '2.02'),
-        ('PRINT ((0.1 * 0.2) + (0.24 * 2))', '0.5'), # .5 float, .50 decimal
+        ('PRINT (0.1 + 0.2) * 2', ' 0.6 '),  # 0.6000000000000001 float (0.6 decimal) within Epsilon (floating point arithmetic error range) should be truncated
+        ('PRINT (0.1 * 0.2) + 2', ' 2.02 '),
+        ('PRINT ((0.1 * 0.2) + (0.24 * 2))', ' 0.5 '), # .5 float, .50 decimal
         # endregion cb7a5a4 (Add support for ( and ) in expressions)
-        (('PRINT 1 - 4 * 2 ^ 3'), '-31'),  # = 1 - (4 * 8) = 1 - 32
-        (('PRINT (1 - 4 * 2) ^ 3'), '-343'),  # = -7 ^ 3 = -343
+        (('PRINT 1 - 4 * 2 ^ 3'), '-31 '),  # = 1 - (4 * 8) = 1 - 32
+        (('PRINT (1 - 4 * 2) ^ 3'), '-343 '),  # = -7 ^ 3 = -343
     )
 )
 def test_extra_arithmetic(capsys, interpreter, expected_output):
@@ -431,7 +433,7 @@ def test_extra_arithmetic(capsys, interpreter, expected_output):
     'interpreter, expected_output',
     indirect=['interpreter'],
     argvalues=(
-        (('PRINTC', 'C=3', 'PRINTC'), '0\n3'),
+        (('PRINTC', 'C=3', 'PRINTC'), ' 0 \n 3 '),
     )
 )
 def test_default_variable_value(capsys, interpreter, expected_output):
@@ -448,8 +450,8 @@ def test_program_line_mid_statement_invalid(interpreter):
     'interpreter, expected_output',
     indirect=['interpreter'],
     argvalues=(
-        (('A = 3', 'B = A = 3', 'PRINT B'), '-1'),
-        (('A = 2', 'B = A = 3', 'PRINT B'), '0'),
+        (('A = 3', 'B = A = 3', 'PRINT B'), '-1 '),
+        (('A = 2', 'B = A = 3', 'PRINT B'), ' 0 '),
     )
 )
 def test_boolean_values(capsys, interpreter, expected_output):
