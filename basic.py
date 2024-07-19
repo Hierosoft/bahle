@@ -28,6 +28,7 @@ class BasicLexer(Lexer):
         MINUS,
         MULTIPLY,
         DIVIDE,
+        POWER,
         EQUALS,
         COLON,
         LPAREN,
@@ -40,6 +41,7 @@ class BasicLexer(Lexer):
     MINUS = r'-'
     MULTIPLY = r'\*'
     DIVIDE = r'/'
+    POWER = r'\^'
     EQUALS = r'='
     COLON = r':'
     LPAREN = r'\('
@@ -116,6 +118,7 @@ class BasicParser(Parser):
         ('left', CREATE_EXPRS, APPEND_EXPRS),
         ('left', PLUS, MINUS),
         ('left', MULTIPLY, DIVIDE),
+        ('left', POWER),  # exponent (*not* same as EXP function)
         ('nonassoc', UNARY_MINUS),
     )
 
@@ -225,6 +228,10 @@ class BasicParser(Parser):
     @_('expr DIVIDE expr')
     def expr(self, parsed):
         return Expression('divide', [parsed.expr0, parsed.expr1])
+
+    @_('expr POWER expr')
+    def expr(self, parsed):
+        return Expression('power', [parsed.expr0, parsed.expr1])
 
     @_(
         'NUMBER',
@@ -339,6 +346,18 @@ class BasicInterpreter:
 
     def divide(self, a, b):
         return a / b
+
+    def power(self, a, b):
+        # NOTE: In Python, `^` is bitwise XOR.
+        # Also, pow differs from math.pow and **
+        #   (See <https://stackoverflow.com/a/10282852/4541104>):
+        # math.pow(0.000000,-2.200000)
+        #     ValueError: math domain error
+        # __builtins__.pow(0.000000,-2.200000)
+        #     ZeroDivisionError: 0.0 cannot be raised to a negative power
+        # ** uses the object's own method, such as if
+        #    __pow__(), __rpow__() or __ipow__() are overridden.
+        return a ** b
 
     def get_variable(self, name):
         return self.variables.get(name, 0)

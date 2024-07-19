@@ -120,6 +120,14 @@ def lexer():
             ('PLUS', '+'),
             ('NUMBER', 5),
         )),
+        ('PRINT 4 * 2 ^ 3', (
+            ('PRINT', 'PRINT'),
+            ('NUMBER', 4),
+            ('MULTIPLY', '*'),
+            ('NUMBER', 2),
+            ('POWER', '^'),
+            ('NUMBER', 3),
+        )),  # = 4 * 8 = 32
         ('PRINT 3 + 5 * -2', (
             ('PRINT', 'PRINT'),
             ('NUMBER', 3),
@@ -334,6 +342,8 @@ def test_conditionals(capsys, interpreter, expected_output):
         ('PRINT (0.1 * 0.2) + 2', '2.02'),
         ('PRINT ((0.1 * 0.2) + (0.24 * 2))', '0.5'), # .5 float, .50 decimal
         # endregion cb7a5a4 (Add support for ( and ) in expressions)
+        (('PRINT 1 - 4 * 2 ^ 3'), '-31'),  # = 1 - (4 * 8) = 1 - 32
+        (('PRINT (1 - 4 * 2) ^ 3'), '-343'),  # = -7 ^ 3 = -343
     )
 )
 def test_extra_arithmetic(capsys, interpreter, expected_output):
