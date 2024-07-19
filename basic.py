@@ -51,14 +51,14 @@ class BasicLexer(Lexer):
     LPAREN = r'\('
     RPAREN = r'\)'
 
-    REM = r"(?:REM|').*"
-    PRINT = r'PRINT'
-    IF = r'IF'
-    THEN = r'THEN'
-    ELSE = r'ELSE'
-    LIST = r'LIST'
-    RUN = r'RUN'
-    GOTO = r'GOTO'
+    REM = r"(?:[Rr][Ee][Mm]|').*"
+    PRINT = r'[Pp][Rr][Ii][Nn][Tt]'
+    IF = r'[Ii][Ff]'
+    THEN = r'[Tt][Hh][Ee][Nn]'
+    ELSE = r'[Ee][Ll][Ss][Ee]'
+    LIST = r'[Ll][Ii][Ss][Tt]'
+    RUN = r'[Rr][Uu][Nn]'
+    GOTO = r'[Gg][Oo][Tt][Oo]'
 
     # ID = r'[A-Za-z_][A-Za-z0-9_]*'  # does not include type suffixes
     ID = r'[a-zA-Z_][a-zA-Z0-9_]*[$%&!#]*'  # includes type suffixes
