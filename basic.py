@@ -557,6 +557,9 @@ class BasicInterpreter:
                         print("Warning: {} was automatically upcast"
                               " to numpy.int64({})"
                               .format(arg, value), file=sys.stderr)
+                        # TODO: Figure out why this happens. It is only
+                        #   known to happen by adding a literal (or
+                        #   Python int) to a numpy.int32.
                     if value < 0:
                         sys.stdout.write("{} ".format(value))
                     else:
