@@ -61,7 +61,7 @@ class BasicLexer(Lexer):
     GOTO = r'GOTO'
 
     # ID = r'[A-Za-z_][A-Za-z0-9_]*'  # does not include type suffixes
-    ID = r'[a-zA-Z_][a-zA-Z0-9_]*[$%&!\#]*'  # includes type suffixes
+    ID = r'[a-zA-Z_][a-zA-Z0-9_]*[$%&!#]*'  # includes type suffixes
 
     @_(r'(?:[0-9]+(?:\.[0-9]*)?|\.[0-9]+)')
     def NUMBER(self, token):
@@ -99,6 +99,8 @@ class BasicLexer(Lexer):
 
         if token.value.endswith('"'):
             token.value = token.value[:-1]
+        else:
+            raise SyntaxError("Unterminated string (missing '\"')")
 
         return token
 

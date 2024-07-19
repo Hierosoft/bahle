@@ -364,6 +364,10 @@ def test_rem_syntax_error(interpreter):
     with pytest.raises(SyntaxError):
         interpreter.interpret('PRINT"A"REM')
 
+def test_unterminated_string_syntax_error(interpreter):
+    with pytest.raises(SyntaxError):
+        interpreter.interpret('PRINT "A')
+
 
 @pytest.mark.parametrize(
     'interpreter, expected_output',
