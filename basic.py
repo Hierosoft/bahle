@@ -374,6 +374,21 @@ class BasicInterpreter:
         return -a
 
     def add(self, a, b):
+        if not isinstance(a, type(b)):
+            # TODO: test type coercion & make sure it matches BASIC
+            #   (Should be fine since typically this would happen in a PRINT statement)
+            if isinstance(a, str):
+                if not isinstance(b, str):
+                    print("Warning: Coercing {} to {}"
+                        .format(type(b).__name__, type(a).__name__),
+                        file=sys.stderr)
+                    b = type(a)(b)
+            elif isinstance(b, str):
+                if not isinstance(a, str):
+                    print("Warning: Coercing {} to {}"
+                        .format(type(a).__name__, type(b).__name__),
+                        file=sys.stderr)
+                    a = type(b)(a)
         return a + b
 
     def subtract(self, a, b):
@@ -537,7 +552,11 @@ class BasicInterpreter:
                         sys.stdout.write("{} ".format(v_str))
                     else:
                         sys.stdout.write(" {} ".format(v_str))
-                elif isinstance(value, (np.int16, np.int32)):
+                elif isinstance(value, (np.int16, np.int32, np.int64)):
+                    if isinstance(value, np.int64):
+                        print("Warning: {} was automatically upcast"
+                              " to numpy.int64({})"
+                              .format(arg, value), file=sys.stderr)
                     if value < 0:
                         sys.stdout.write("{} ".format(value))
                     else:
