@@ -3,14 +3,15 @@ import math
 import numpy as np
 import sys
 
+import sly
 from sly.lex import Lexer, Token
 from sly.yacc import Parser
-
 
 Variable = collections.namedtuple('Variable', ['name'])
 Expression = collections.namedtuple('Expression', ['operation', 'arguments'])
 Statement = collections.namedtuple('Statement', ['operation', 'arguments'])
 ControlCharacter = collections.namedtuple('Statement', ['operation', 'arguments'])
+
 
 class BasicLexer(Lexer):
     tokens = {
@@ -18,6 +19,10 @@ class BasicLexer(Lexer):
         REM,
         PRINT,
         FLUSH,
+        DIM,
+        REDIM,
+        AS,
+        TYPE_NAME,  # A specific type, *not* the TYPE statement
         IF,
         THEN,
         ELSE,
@@ -35,7 +40,7 @@ class BasicLexer(Lexer):
         EQUALS,
         COLON,
         LPAREN,
-        RPAREN
+        RPAREN,
     }
 
     ignore = ' '
@@ -51,7 +56,11 @@ class BasicLexer(Lexer):
     LPAREN = r'\('
     RPAREN = r'\)'
 
+    AS = r'[Aa][Ss]'
+    TYPE_NAME = r'([Ii][Nn][Tt][Ee][Gg][Ee][Rr])|([Ll][Oo][Nn][Gg])|([Ss][Ii][Nn][Gg][Ll][Ee])|([Dd][Oo][Uu][Bb][Ll][Ee])|([Ss][Tt][Rr][Ii][Nn][Gg])'
     REM = r"(?:[Rr][Ee][Mm]|').*"
+    DIM = r'[Dd][Ii][Mm]'
+    REDIM = r'[Rr][Ee][Dd][Ii][Mm]'
     PRINT = r'[Pp][Rr][Ii][Nn][Tt]'
     IF = r'[Ii][Ff]'
     THEN = r'[Tt][Hh][Ee][Nn]'
@@ -194,6 +203,34 @@ class BasicParser(Parser):
     def statement(self, parsed):
         return Statement('print', parsed.exprs)
 
+    @_('DIM ID AS TYPE_NAME MULTIPLY expr')
+    def statement(self, parsed):
+        return Statement('dim', ['DIM', parsed.ID, parsed.TYPE_NAME, parsed.expr])
+
+    @_('DIM ID AS TYPE_NAME')
+    def statement(self, parsed):
+        # TODO: allow String * NUMBER to set length
+        return Statement('dim', ['DIM', parsed.ID, parsed.TYPE_NAME])
+
+    @_('DIM ID')
+    def statement(self, parsed):
+        # TODO: allow String * NUMBER to set length
+        return Statement('dim', ['DIM', parsed.ID])
+
+    @_('REDIM ID AS TYPE_NAME MULTIPLY expr')
+    def statement(self, parsed):
+        return Statement('dim', ['REDIM', parsed.ID, parsed.TYPE_NAME, parsed.expr])
+
+    @_('REDIM ID AS TYPE_NAME')
+    def statement(self, parsed):
+        # TODO: allow String * NUMBER to set length
+        return Statement('dim', ['REDIM', parsed.ID, parsed.TYPE_NAME])
+
+    @_('REDIM ID')
+    def statement(self, parsed):
+        # TODO: allow String * NUMBER to set length
+        return Statement('dim', ['REDIM', parsed.ID])
+
     @_('LIST')
     def statement(self, parsed):
         return Statement('list', [])
@@ -279,8 +316,15 @@ class BasicParser(Parser):
             raise EOFError('Parse error in input, unexpected EOF')
         friendly_type = BasicParser.FRIENDLY_TYPES.get(token.type)
         if not friendly_type:
-            friendly_type = token.type
-        if friendly_type.upper() == token.value.upper():
+            if isinstance(token.type, str):
+                # TODO: Why does this happen? Should .type = 'LINENO' be changed?
+                friendly_type = token.type
+            else:
+                friendly_type = token.type.__name__
+        if (isinstance(token.value, str)
+                and (friendly_type.upper() == token.value.upper())):
+            # It is a statement and the statement is the same as the token.
+            # (in another case the value could be a number etc)
             raise SyntaxError(
                 'Unexpected "{}"'
                 .format(token.value)
@@ -302,11 +346,20 @@ class BasicInterpreter:
             (which is allowed in BASIC), the old variable name in the
             value should be deleted from self.variables.
     """
+    DEFAULT_TYPE = np.float32  # QB Single
     SUFFIX_TYPES = {
         '%': np.int16,  # QB Integer
-        '&': np.int32,  # QB Long integer
+        '&': np.int32,  # QB Long
         '!': np.float32,  # QB Single
         '#': np.float64,  # QB Double
+        '$': str,  # QB String
+    }
+    TYPE_NAME_TYPES = {
+        'INTEGER': np.int16,
+        'LONG': np.int32,
+        'SINGLE': np.float32,
+        'DOUBLE': np.float64,
+        'STRING': str,
     }
     def __init__(self):
         self.lexer = BasicLexer()
@@ -315,6 +368,8 @@ class BasicInterpreter:
         self.program = {}
         self.running_program = False
         self.typed_names = {}
+        self.strlen = {}
+        self.types = {}
 
     def interpret(self, line):
         try:
@@ -432,12 +487,33 @@ class BasicInterpreter:
     def get_variable(self, name):
         return self.variables.get(name, 0)
 
+    @staticmethod
+    def split_type(name):
+        """Split ID or NUMBER from type specifier suffix"""
+        last_backquote = name.find("`")
+        if last_backquote > -1:
+            # multi-bit type has ` followed by #of bits.
+            raise NotImplementedError("MULTIBIT type is not implemented.")
+            return name[:last_backquote], name[last_backquote:]
+        if "~" in name:
+            raise NotImplementedError("unsigned types are not implemented.")
+        bare_name = name.rstrip("`~%#!&$")
+        if bare_name != name:
+            return bare_name, name[len(bare_name)-len(name):]  # negative slice from diff
+        else:
+            # otherwise the diff isn't negative, so don't slice improperly
+            return name, ""
+
     def set_variable(self, name, value):
-        suffix = name[-1:]
-        suffix_type = BasicInterpreter.SUFFIX_TYPES.get(suffix)
-        # TODO: lookup type of variable (as set by `DEF*`` and `as *`)
-        if suffix_type:
-            # if name[-2:-1] in BasicInterpreter.CAST:
+        # print("[set_variable] {}={}({})"
+        #       .format(name, type(value).__name__, value))
+        bare_name, suffix = BasicInterpreter.split_type(name) # name[-1:]
+        if suffix:
+            suffix_type = BasicInterpreter.SUFFIX_TYPES.get(suffix)
+            if not suffix_type:
+                raise NotImplementedError("Type suffix {} is not implemented."
+                                          .format(suffix))
+            # if name[-2:-1] in BasicInterpreter.SUFFIX_TYPES:
             #     raise NotImplementedError(
             #         "{} suffix is not implemented"
             #         .format(name[2:]))
@@ -445,23 +521,22 @@ class BasicInterpreter:
             #     # <https://qb64.dijkens.com/wiki/Data_types.html#Data_type_limits>
             # ^ More than 1 (allowed in BASIC) is already blocked by the
             #   ID regex in Lexer
-            part0 = name.rstrip(name[-1:])
-            old_name = self.typed_names.get(part0)
+            old_name = self.typed_names.get(bare_name)
             if old_name is not None:
                 if old_name != name:
                     # NOTE: QB allows type redefinition
                     print("Warning: Overriding {} type with redeclaration {}"
                           .format(old_name, name))
                     del self.variables[old_name]
-                    self.typed_names[part0] = name
+                    self.typed_names[bare_name] = name
             else:
-                self.typed_names[part0] = name
-            self.variables[name] = suffix_type(self.evaluate(value))
+                self.typed_names[bare_name] = name
+            this_type = suffix_type
             # ^ causes "DeprecationWarning: NumPy will stop allowing conversion of out-of-bound Python integers to integer arrays.  The conversion of 65536 to int16 will fail in the future.
             #   For the old behavior, usually:
             #       np.array(value).astype(dtype)`
             #   will give the desired result (the cast overflows).
-            #     self.variables[name] = cast(self.evaluate(value))
+            #     self.variables[name] = suffix_type(self.evaluate(value))
 
             # -- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html"
             # Therefore:
@@ -474,9 +549,37 @@ class BasicInterpreter:
             #     self.variables[name] = suffix_type(self.evaluate(value))
             # Maybe just require numpy <= 1.21.5 ...
         else:
-            self.variables[name] = self.evaluate(value)
+            this_type = self.types.get(bare_name)
+            # TODO: lookup type of first letter of bare_name as set by `DEF* criteria`)
+            if this_type is None:
+                this_type = BasicInterpreter.DEFAULT_TYPE
+                # print("Warning: Used default type {} for {}"
+                #       .format(this_type.__name__, bare_name))
+
+        final_value = self.evaluate(value)
+        if this_type is str:
+            if not isinstance(final_value, str):
+                raise TypeError(
+                    "Illegal string-number conversion {}({}, {}) = {}({})"
+                    .format(this_type, bare_name, suffix,
+                            type(final_value).__name__, final_value))
+        elif isinstance(final_value, str):
+            if this_type is not str:
+                raise TypeError(
+                    "Illegal string-number conversion {}({}, {}) = {}({})"
+                    .format(this_type.__name__, bare_name, suffix,
+                            type(final_value).__name__, final_value))
+
+        # print("[set_variable] {}={}({})"
+        #       .format(name, type(final_value).__name__, final_value),
+        # )  # file=sys.stderr)
+
+        self.variables[name] = this_type(final_value)
 
     def compare_variable(self, name, value):
+        # print("[compare_variable] {} == {}\n"
+        #       .format(self.variables[name], value),
+        # )#file=sys.stderr)
         return -1 if self.variables[name] == value else 0
 
     def add_program_line(self, lineno, line):
@@ -542,11 +645,77 @@ class BasicInterpreter:
     def noop(self):
         pass
 
+    def dim(self, *args):
+        keyword = args[0]
+        id = args[1]
+        type_name = args[2] if len(args) > 2 else None
+        length = args[3] if len(args) > 3 else None
+        this_type = None
+        if len(args):
+            if not type_name:
+                raise SyntaxError("missing type specifier after AS")
+            this_type = BasicInterpreter.TYPE_NAME_TYPES.get(type_name.upper())
+        if this_type is None:
+            raise SyntaxError(
+                "invalid type \"{}\" specified".format(this_type))
+        bare_name, suffix = BasicInterpreter.split_type(id)
+        if suffix:
+            if (len(args) > 2):
+                raise SyntaxError(
+                    "Using a type suffix ('{}') for \"{}\" with `AS` is redundant."
+                    .format(suffix, id))
+            this_type = BasicInterpreter.SUFFIX_TYPES.get(suffix)
+            if this_type is None:
+                raise NotImplementedError("Type suffix {} is invalid."
+                                          .format(suffix))
+        elif this_type is None:
+            this_type = BasicInterpreter.DEFAULT_TYPE
+        old_name = self.typed_names.get(bare_name)
+        if keyword == "DIM":
+            if old_name is not None:
+                raise SyntaxError(
+                    "redeclaration of {} (declared as {}) requires REDIM"
+                    .format(id, old_name)
+                )
+            elif id in self.variables:
+                raise SyntaxError(
+                    "redeclaration of {} requires REDIM"
+                    .format(id)
+                )
+            if id in self.strlen:
+                raise NotImplementedError(
+                    "cleanup failed for {} length={}"
+                    .format(id, self.strlen[id])
+                )
+        elif keyword == "REDIM":
+            if old_name is not None:
+                # TODO: Mimic BASIC behavior here (behavior is unknown).
+                print("Warning: {} is overwriting {} with {}"
+                      .format(keyword, old_name, id),
+                      file=sys.stderr)
+                del self.typed_names[bare_name]
+                del self.variables[old_name]
+            if id in self.strlen:
+                del self.strlen[id]
+        else:
+            raise NotImplementedError("Expected DIM or REDIM but got {}"
+                                      .format(keyword))
+        if type_name.upper() == "STRING":
+            self.variables[id] = this_type("")
+            if length:
+                self.strlen[id] = length
+        else:
+            self.variables[id] = this_type(0)
+            if length:
+                raise SyntaxError("`* length` is only valid for STRING.")
+        self.types[bare_name] = this_type  # type_name.upper()
+
     def print(self, *args):
         """Print with a space around numbers like BASIC.
         There are no spaces around strings in BASIC.
         """
         # TODO: Make number formatting configurable (Only if BASIC has a way)
+        length = 0
         for arg in args:
             if isinstance(arg, ControlCharacter):
                 if arg.operation == 'flush':
@@ -558,13 +727,22 @@ class BasicInterpreter:
                     )
             else:
                 value = self.evaluate(arg)
+                if "{}".format(value) == "":
+                    print("Warning: got '' from {}".format(arg),
+                          file=sys.stderr)
                 if isinstance(value, (np.float32, np.float64)):
                     v_str = "{:7f}".format(value).rstrip("0.")
-                    # ^ deal with floating point arithmetic inaccuracy
-                    if value < 0:
+                    if not v_str:
+                        v_str = " 0 "
+                        length = 3
+                        sys.stdout.write(v_str)
+                    elif value < 0:
+                        length += len("{} ".format(v_str).strip())
                         sys.stdout.write("{} ".format(v_str))
                     else:
+                        length += len(" {} ".format(v_str).strip())
                         sys.stdout.write(" {} ".format(v_str))
+                    assert length > 0
                 elif isinstance(value, (np.int16, np.int32, np.int64)):
                     if isinstance(value, np.int64):
                         print("Warning: {} was automatically upcast"
@@ -573,23 +751,54 @@ class BasicInterpreter:
                         # TODO: Figure out why this happens. It is only
                         #   known to happen by adding a literal (or
                         #   Python int) to a numpy.int32.
+                    if "{}".format(value) == "":
+                        raise NotImplementedError(
+                            "{} reverted to blank '{}'"
+                            .format(arg, value))
                     if value < 0:
+                        length += len("{} ".format(value).strip())
                         sys.stdout.write("{} ".format(value))
                     else:
+                        length += len(" {} ".format(value).strip())
                         sys.stdout.write(" {} ".format(value))
+                    assert length > 0
                 elif isinstance(value, int):
+                    # raise NotImplementedError(
+                    #     "Numpy was skipped (got {}({}))"
+                    #     .format(type(value).__name__, value))
                     # Returns from comparison
                     # Example: "B = 3: PRINT B = 3" (yields "-1 ")
+                    if "{}".format(value) == "":
+                        raise NotImplementedError(
+                            "{} reverted to blank '{}'"
+                            .format(arg, value))
                     if value < 0:
+                        length += len("{} ".format(value).strip())
                         sys.stdout.write("{} ".format(value))
                     else:
+                        length += len(" {} ".format(value).strip())
                         sys.stdout.write(" {} ".format(value))
+                    assert length > 0
                 elif isinstance(value, float):
                     raise NotImplementedError(
                         "Numpy was skipped (got {}({}))"
                         .format(type(value).__name__, value))
-                else:
+                elif isinstance(value, str):
+                    length += len(value)
                     sys.stdout.write(value)
+                else:
+                    # ok probably
+                    raise NotImplementedError(
+                        "Unknown type {}({})"
+                        .format(type(value).__name__, value))
+                    length += len(value)
+                    sys.stdout.write(value)
+        # if len(args) == 0:
+        #     raise NotImplementedError("No args in PRINT")
+        # if length == 0:
+        #     # ok probably
+        #     raise NotImplementedError(
+        #         "args {} became ''".format(args))
         print("")
 
     def list(self):
