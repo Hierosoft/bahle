@@ -122,6 +122,9 @@ class LineLexer(Lexer):
 
 
 class BasicParser(Parser):
+    FRIENDLY_TYPES = {
+        'ID': "identifier",
+    }
     tokens = BasicLexer.tokens.union(LineLexer.tokens)
     precedence = (
         ('nonassoc', IF, THEN),
@@ -274,10 +277,20 @@ class BasicParser(Parser):
     def error(self, token):
         if not token:
             raise EOFError('Parse error in input, unexpected EOF')
-
-        raise SyntaxError(
-            f'Syntax error at line {token.lineno}, token={token.type}'
-        )
+        friendly_type = BasicParser.FRIENDLY_TYPES.get(token.type)
+        if not friendly_type:
+            friendly_type = token.type
+        if friendly_type.upper() == token.value.upper():
+            raise SyntaxError(
+                'Unexpected "{}"'
+                .format(token.value)
+            )
+        else:
+            raise SyntaxError(
+                'Unexpected {} "{}"'
+                .format(friendly_type, token.value)
+            )
+        # token.lineno
 
 
 class BasicInterpreter:
