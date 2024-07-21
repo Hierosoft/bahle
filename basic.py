@@ -804,3 +804,9 @@ class BasicInterpreter:
     def list(self):
         for lineno, line in sorted(self.program.items()):
             print(f'{lineno} {line}')
+
+if __name__ == "__main__":
+    raise RuntimeError(
+        "The {} module should be imported not run."
+        " Use main.py to run a file."
+        .format(__file__))
