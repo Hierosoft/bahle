@@ -1,9 +1,9 @@
 import pytest
-from basic import BasicInterpreter
+from bahle.basicinterpreter import BasicInterpreter
 
 @pytest.fixture
 def lexer():
-    from basic import BasicLexer
+    from bahle.basiclexer import BasicLexer
     return BasicLexer()
 
 
@@ -215,7 +215,7 @@ def test_lexer(lexer, test_string, expected_tokens):
 
 @pytest.fixture
 def interpreter(request):
-    from basic import BasicInterpreter
+    from bahle.basicinterpreter import BasicInterpreter
 
     interpreter = BasicInterpreter()
 

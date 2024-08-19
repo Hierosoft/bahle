@@ -2,7 +2,7 @@ import os
 import sly
 import sys
 
-from basic import BasicInterpreter
+from bahle.basicinterpreter import BasicInterpreter
 
 
 def print_title():
