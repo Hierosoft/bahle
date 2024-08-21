@@ -39,6 +39,11 @@ class BasicLexer(Lexer):
         DIVIDE,
         POWER,
         EQUALS,
+        GT,
+        LT,
+        GE,
+        LE,
+        NE,
         COLON,
         LPAREN,
         RPAREN,
@@ -52,6 +57,12 @@ class BasicLexer(Lexer):
     MULTIPLY = r'\*'
     DIVIDE = r'/'
     POWER = r'\^'
+    # Below are order-dependent (patterns starting with another!):
+    NE = r'<>'
+    LE = r'<='
+    GE = r'>='
+    GT = r'>'
+    LT = r'<'
     EQUALS = r'='
     COLON = r':'
     LPAREN = r'\('

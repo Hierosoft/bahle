@@ -1,15 +1,62 @@
 # -*- coding: utf-8 -*-
 import collections
-import math
+# import math
 import numpy as np
 import sys
+
+from logging import getLogger
 
 from bahle.basiclexer import BasicLexer
 from bahle.basicparser import (
     BasicParser,
-    Expression,
     ControlCharacter,
+    Expression,
+    Statement,
+    Variable,
 )
+
+logger = getLogger(__name__)
+
+alphabet_lower = "abcdefghijklmnopqrstuvwxyz"
+alphabet_upper = alphabet_lower.upper()
+alphabet_case_insensitive = alphabet_lower + alphabet_upper
+
+
+def get_names(*args):
+    names = []
+    expr_i = 0
+    statement_i = 0
+    other_i = 0
+    for arg in args:
+        if isinstance(arg, Variable):
+            names.append(arg.name)
+        elif isinstance(arg, Expression):
+            names.append("expr{}".format(expr_i))
+            expr_i += 1
+        elif isinstance(arg, Statement):
+            names.append("statement{}".format(statement_i))
+            statement_i += 1
+        else:
+            names.append("other{}.{}".format(other_i, type(arg).__name__))
+            other_i += 1
+    return names
+
+
+def assert_compare_allowed(*args, names=None):
+    allowed_types = tuple(BasicInterpreter.TYPE_NAME_TYPES.values())
+    if not names:
+        if len(args) == 2:
+            names = ('a', 'b')
+        elif len(args) <= 26:
+            names = alphabet_lower
+        else:
+            names = ["" for i in range(len(args))]
+            # ^ blank (index is below)
+    for i, var in enumerate(args):
+        if not isinstance(var, allowed_types):
+            raise TypeError(
+                "error:_ operand[{}]{} is {}({})"
+                .format(i, names[i], type(var).__name__, var))
 
 
 class BasicInterpreter:
@@ -96,6 +143,14 @@ class BasicInterpreter:
 
                 else:
                     return self.visit(next_node)
+
+    def to_value(self, expression):
+        # TODO: I don't know if this should be in evaluate, but was
+        #   necessary for comparison functions -Poikilos
+        node = self.evaluate(expression)
+        if isinstance(node, Variable):
+            return self.variables[node.name]
+        return node
 
     def visit(self, node):
         return_value = node
@@ -251,11 +306,70 @@ class BasicInterpreter:
 
         self.variables[name] = this_type(final_value)
 
-    def compare_variable(self, name, value):
-        # print("[compare_variable] {} == {}\n"
+    # def variable_equals_value(self, name, value):
+    #     # print("[any_equals_any] {} == {}\n"
+    #     #       .format(self.variables[name], value),
+    #     # )#file=sys.stderr)
+    #     return -1 if self.variables[name] == value else 0
+
+    def any_equals_any(self, a, b):
+        # print("[any_equals_any] {} == {}\n"
         #       .format(self.variables[name], value),
         # )#file=sys.stderr)
-        return -1 if self.variables[name] == value else 0
+        names = get_names(a, b)
+        a = self.to_value(a)
+        b = self.to_value(b)
+        assert_compare_allowed(a, b, names=names)
+        # return -1 if self.evaluate(a) == self.evaluate(b) else 0
+        return -1 if a == b else 0
+
+    def any_gt_any(self, a, b):
+        # logger.info(
+        #     "PREVIEW: {}({}) GT {}({})"
+        #     .format(type(a).__name__, a,
+        #             type(b).__name__, b))
+        names = get_names(a, b)
+        a = self.to_value(a)
+        b = self.to_value(b)
+        assert_compare_allowed(a, b, names=names)
+        # return -1 if self.evaluate(a) > self.evaluate(b) else 0
+        return -1 if a > b else 0
+
+    def any_lt_any(self, a, b):
+        # logger.info(
+        #     "PREVIEW: {}({}) LT {}({})"
+        #     .format(type(a).__name__, a,
+        #             type(b).__name__, b))
+        names = get_names(a, b)
+        a = self.to_value(a)
+        b = self.to_value(b)
+        assert_compare_allowed(a, b, names=names)
+        # return -1 if self.evaluate(a) < self.evaluate(b) else 0
+        return -1 if a < b else 0
+
+    def any_ge_any(self, a, b):
+        names = get_names(a, b)
+        a = self.to_value(a)
+        b = self.to_value(b)
+        assert_compare_allowed(a, b, names=names)
+        # return -1 if self.evaluate(a) >= self.evaluate(b) else 0
+        return -1 if a >= b else 0
+
+    def any_le_any(self, a, b):
+        names = get_names(a, b)
+        a = self.to_value(a)
+        b = self.to_value(b)
+        assert_compare_allowed(a, b, names=names)
+        # return -1 if self.evaluate(a) <= self.evaluate(b) else 0
+        return -1 if a <= b else 0
+
+    def any_ne_any(self, a, b):
+        names = get_names(a, b)
+        a = self.to_value(a)
+        b = self.to_value(b)
+        assert_compare_allowed(a, b, names=names)
+        # return -1 if self.evaluate(a) != self.evaluate(b) else 0
+        return -1 if a != b else 0
 
     def add_program_line(self, lineno, line):
         self.program[lineno] = line

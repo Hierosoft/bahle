@@ -34,7 +34,11 @@ class BasicParser(Parser):
         ('nonassoc', IF, THEN),
         ('left', COLON),
         ('nonassoc', ELSE),
-        ('left', EQUALS),
+        # ('right', EQUALS),  # right to allow x = a = b
+        ('nonassoc', EQUALS, LT, GT, LE, GE, NE),
+        # ^ needs to be nonassoc so = isn't associated with itself...
+        #   since it has a different meaning based on context.
+        # separate from EQUALS to allow x=a>b?
         ('nonassoc', FLUSH),
         ('left', CREATE_EXPRS, APPEND_EXPRS),
         ('left', PLUS, MINUS),
@@ -147,12 +151,90 @@ class BasicParser(Parser):
         parsed.exprs.append(parsed.expr)
         return parsed.exprs
 
-    @_('variable EQUALS expr')
+    @_('expr EQUALS expr')
     def expr(self, parsed):
-        return Expression(
-            'compare_variable',
-            [parsed.variable.name, parsed.expr],
-        )
+        return Expression('any_equals_any', [parsed.expr0, parsed.expr1])
+
+    @_('variable EQUALS expr', 'expr EQUALS variable')
+    def expr(self, parsed):
+        return Expression('any_equals_any', [parsed.variable, parsed.expr])
+
+    @_('variable EQUALS variable')
+    def expr(self, parsed):
+        return Expression('any_equals_any', [parsed.variable0, parsed.variable1])
+
+    @_('expr LT expr')
+    def expr(self, parsed):
+        return Expression('any_lt_any', [parsed.expr0, parsed.expr1])
+
+    @_('variable LT variable')
+    def expr(self, parsed):
+        return Expression('any_lt_any', [parsed.variable0, parsed.variable1])
+
+    # 'expr GT variable' Allow reverse order only if sign is reversed somehow doesn't work
+    @_('variable LT expr')
+    def expr(self, parsed):
+        return Expression('any_lt_any', [parsed.variable, parsed.expr])
+
+    @_('expr GT variable')
+    def expr(self, parsed):
+        return Expression('any_gt_any', [parsed.expr, parsed.variable])
+
+    @_('expr GT expr')
+    def expr(self, parsed):
+        return Expression('any_gt_any', [parsed.expr0, parsed.expr1])
+
+    @_('variable GT variable')
+    def expr(self, parsed):
+        return Expression('any_gt_any', [parsed.variable0, parsed.variable1])
+
+    # 'expr LT variable' Allow reverse order only if sign is reversed
+    #   doesn't work somehow
+    @_('variable GT expr')
+    def expr(self, parsed):
+        return Expression('any_gt_any', [parsed.variable, parsed.expr])
+
+    @_('expr LT variable')
+    def expr(self, parsed):
+        return Expression('any_lt_any', [parsed.expr, parsed.variable])
+
+    @_('expr LE expr')
+    def expr(self, parsed):
+        return Expression('any_le_any', [parsed.expr0, parsed.expr1])
+
+    @_('variable LE variable')
+    def expr(self, parsed):
+        return Expression('any_le_any', [parsed.variable0, parsed.variable1])
+
+    # Allow reverse order only if sign is reversed:
+    @_('variable LE expr', 'expr GE variable')
+    def expr(self, parsed):
+        return Expression('any_le_any', [parsed.variable, parsed.expr])
+
+    @_('expr GE expr')
+    def expr(self, parsed):
+        return Expression('any_ge_any', [parsed.expr0, parsed.expr1])
+
+    @_('variable GE variable')
+    def expr(self, parsed):
+        return Expression('any_ge_any', [parsed.variable0, parsed.variable1])
+
+    # Allow reverse order only if sign is reversed:
+    @_('variable GE expr', 'expr LE variable')
+    def expr(self, parsed):
+        return Expression('any_ge_any', [parsed.variable, parsed.expr])
+
+    @_('expr NE expr')
+    def expr(self, parsed):
+        return Expression('any_ne_any', [parsed.expr0, parsed.expr1])
+
+    @_('variable NE variable')
+    def expr(self, parsed):
+        return Expression('any_ne_any', [parsed.variable0, parsed.variable1])
+
+    @_('variable NE expr', 'expr NE variable')
+    def expr(self, parsed):
+        return Expression('any_ne_any', [parsed.variable, parsed.expr])
 
     @_('MINUS expr %prec UNARY_MINUS')
     def expr(self, parsed):

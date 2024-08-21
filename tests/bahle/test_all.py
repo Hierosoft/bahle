@@ -1,5 +1,9 @@
 import pytest
+
+import numpy as np
+
 from bahle.basicinterpreter import BasicInterpreter
+
 
 @pytest.fixture
 def lexer():
@@ -276,7 +280,6 @@ def test_interpreter_int32_bankers_rounding_up(interpreter):
     assert interpreter.variables['A&'] == 3
     # FIXME: 4 in QB64pe 3.13.1 and Python, but not in numpy
 
-import numpy as np
 
 @pytest.mark.parametrize('interpreter', indirect=True, argvalues=[(
     'A! = 3.5',  # Single (float32)
@@ -378,9 +381,169 @@ def test_interpreter_list(capsys, interpreter, expected_output):
         (('PRINT "B"; "B"'), 'BB'),
         (('A = 2: B = 3', 'PRINT "B"; A + B'), 'B 5 '),
         (('A = 2: B = 3', 'PRINT "B"; A - B'), 'B-1 '),
+        (('a = 10', 'b = 11', 'Print a + b'), ' 21 '),
     )
 )
 def test_print_output(capsys, interpreter, expected_output):
+    captured = capsys.readouterr()
+    assert captured.out == expected_output + '\n'
+
+
+@pytest.mark.parametrize(
+    'interpreter, expected_output',
+    indirect=['interpreter'],
+    argvalues=(
+        (('a = 11', 'Print a = 10', 'Print a = 10'), ' 0 \n 0 '),
+        (('a = 11', 'Print a = 11'), '-1 '),
+        # ^ ensure comparison doesn't cause assignment
+        (('a = 11', 'b = 10', 'Print a = b', 'Print a = b'), ' 0 \n 0 '),
+        (('a = 11', 'b = 11', 'Print a = b'), '-1 '),
+        # ^ ensure comparison doesn't cause assignment
+        (('a = 11', 'b = 10', 'Print -1 + a + b = 20'), '-1 '),  # FIXME: 1
+        (('a = 11', 'b = 10', 'x = a = b', 'Print x'), ' 0 '),
+    )
+)
+def test_inline_comparison(capsys, interpreter, expected_output):
+    captured = capsys.readouterr()
+    assert captured.out == expected_output + '\n'
+
+
+@pytest.mark.parametrize(
+    'interpreter, expected_output',
+    indirect=['interpreter'],
+    argvalues=(
+        ('Print 10 > 11', ' 0 '),
+        ('Print 11 < 10', ' 0 '),
+        ('Print 10 >= 11', ' 0 '),
+        ('Print 11 <= 10', ' 0 '),
+        ('Print 11 > 10', '-1 '),
+        ('Print 10 < 11', '-1 '),
+        ('Print 11 >= 10', '-1 '),
+        ('Print 10 <= 11', '-1 '),
+    )
+)
+def test_literal_inequalities(capsys, interpreter, expected_output):
+    captured = capsys.readouterr()
+    assert captured.out == expected_output + '\n'
+
+@pytest.mark.parametrize(
+    'interpreter, expected_output',
+    indirect=['interpreter'],
+    argvalues=(
+        (('a = 10', 'Print a > 11'), ' 0 '),
+        (('a = 11', 'Print a < 10'), ' 0 '),
+        (('a = 10', 'Print a >= 11'), ' 0 '),
+        (('a = 11', 'Print a <= 10'), ' 0 '),
+        (('a = 11', 'Print a > 10'), '-1 '),
+        (('a = 10', 'Print a < 11'), '-1 '),
+        (('a = 11', 'Print a >= 10'), '-1 '),
+        (('a = 10', 'Print a <= 11'), '-1 '),
+    )
+)
+def test_variable_to_literal_inequalities(capsys, interpreter, expected_output):
+    captured = capsys.readouterr()
+    assert captured.out == expected_output + '\n'
+
+@pytest.mark.parametrize(
+    'interpreter, expected_output',
+    indirect=['interpreter'],
+    argvalues=(
+        (('a = 11', 'Print 10 > a'), ' 0 '),
+        (('a = 10', 'Print 11 < a'), ' 0 '),
+        (('a = 11', 'Print 10 >= a'), ' 0 '),
+        (('a = 10', 'Print 11 <= a'), ' 0 '),
+        (('a = 10', 'Print 11 > a'), '-1 '),
+        (('a = 11', 'Print 10 < a'), '-1 '),
+        (('a = 10', 'Print 11 >= a'), '-1 '),
+        (('a = 11', 'Print 10 <= a'), '-1 '),
+        (('a = 11', 'Print 10 <> a'), '-1 '),
+        (('a = 11', 'Print 11 <> a'), ' 0 '),
+    )
+)
+def test_literal_to_variable_inequalities(capsys, interpreter, expected_output):
+    captured = capsys.readouterr()
+    assert captured.out == expected_output + '\n'
+
+
+
+@pytest.mark.parametrize(
+    'interpreter, expected_output',
+    indirect=['interpreter'],
+    argvalues=(
+        (('a = 10', 'b = 11', 'Print a > b'), ' 0 '),
+        (('a = 11', 'b = 10', 'Print a < b'), ' 0 '),
+        (('a = 10', 'b = 11', 'Print a >= b'), ' 0 '),
+        (('a = 11', 'b = 10', 'Print a <= b'), ' 0 '),
+        (('a = 11', 'b = 10', 'Print a > b'), '-1 '),
+        (('a = 10', 'b = 11', 'Print a < b'), '-1 '),
+        (('a = 11', 'b = 10', 'Print a >= b'), '-1 '),
+        (('a = 10', 'b = 11', 'Print a <= b'), '-1 '),
+        (('a = 11', 'b = 10', 'Print b <> a'), '-1 '),
+        (('a = 11', 'b = 11', 'Print b <> a'), ' 0 '),
+    )
+)
+def test_variable_to_variable_inequalities(capsys, interpreter, expected_output):
+    captured = capsys.readouterr()
+    assert captured.out == expected_output + '\n'
+
+@pytest.mark.parametrize(
+    'interpreter, expected_output',
+    indirect=['interpreter'],
+    argvalues=(
+        ('Print 10 > 5 + 6', ' 0 '),
+        ('Print 11 < 4 + 6', ' 0 '),
+        ('Print 10 >= 5 + 6', ' 0 '),
+        ('Print 11 <= 4 + 6', ' 0 '),
+        ('Print 11 > 4 + 6', '-1 '),
+        ('Print 10 < 5 + 6', '-1 '),
+        ('Print 11 >= 4 + 6', '-1 '),
+        ('Print 10 <= 5 + 6', '-1 '),
+        (('a = 10', 'b = 11', 'x = 21 > a + b', 'Print x'), ' 0 '), # FIXME: 1
+        (('a = 10', 'b = 11', 'Print 21 > a + b'), ' 0 '), # FIXME: 1
+        (('a = 10', 'b = 11', 'x = 21 > a + b - 1', 'Print x'), '-1 '),  # FIXME: 9
+        (('a = 10', 'b = 11', 'Print 21 > a + b - 1'), '-1 '),  # FIXME: 9
+        (('a = 10', 'b = 11', 'IF 21 > a + b THEN PRINT -1 ELSE PRINT 0'), ' 0 '), # FIXME: 1
+        (('a = 10', 'b = 11', 'IF 21 > a + b - 1 THEN PRINT -1 ELSE PRINT 0', ), '-1 '),  # FIXME: 9
+    )
+)
+def test_literal_to_expression_inequalities(capsys, interpreter, expected_output):
+    captured = capsys.readouterr()
+    assert captured.out == expected_output + '\n'
+
+
+@pytest.mark.parametrize(
+    'interpreter, expected_output',
+    indirect=['interpreter'],
+    argvalues=(
+        ('Print 5 + 6 < 10', ' 0 '),
+        ('Print 4 + 6 > 11', ' 0 '),
+        ('Print 5 + 6 <= 10', ' 0 '),
+        ('Print 4 + 6 >= 11', ' 0 '),
+        ('Print 4 + 6 < 11', '-1 '),
+        ('Print 5 + 6 > 10', '-1 '),
+        ('Print 4 + 6 <= 11', '-1 '),
+        ('Print 5 + 6 >= 10', '-1 '),
+        (('a = 11', 'b = 10', 'Print a + b < 21'), ' 0 '),  # FIXME: 1
+        (('a = 11', 'b = 10', 'Print -1 + a + b < 21'), '-1 '),  # FIXME: 9
+        (('a = 11', 'b = 10', 'IF a + b < 21 THEN PRINT -1 ELSE PRINT 0'), ' 0 '),  # FIXME: -1
+        (('a = 11', 'b = 10', 'IF -1 + a + b < 21 THEN PRINT -1 ELSE PRINT 0'), '-1 '),
+    )
+)
+def test_expression_to_literal_inequalities(capsys, interpreter, expected_output):
+    captured = capsys.readouterr()
+    assert captured.out == expected_output + '\n'
+
+@pytest.mark.parametrize(
+    'interpreter, expected_output',
+    indirect=['interpreter'],
+    argvalues=(
+        (('a = 10', 'b = 11', 'Print a + b >= 9 + 13'), ' 0 '),  # FIXME: 1
+        (('a = 11', 'b = 10', 'Print 9 + 13 <= a + b'), ' 0 '),  # FIXME: 1
+        (('a = 10', 'b = 11', 'Print a + b >= 9 + 12'), '-1 '),  # FIXME: 1
+        (('a = 11', 'b = 10', 'Print -9 + -13 <= a - b'), '-1 '),  # FIXME: -11
+    )
+)
+def test_expression_to_expression_inequalities(capsys, interpreter, expected_output):
     captured = capsys.readouterr()
     assert captured.out == expected_output + '\n'
 

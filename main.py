@@ -18,9 +18,12 @@ def print_title():
 
 
 def run_file(path):
+    path = os.path.abspath(path)  # allow symlinks unlike realpath
     print_title()
 
     interpreter = BasicInterpreter()
+    if not os.path.isfile(path):
+        raise FileNotFoundError(path)
     parent = os.path.dirname(path)
     os.chdir(parent)
     lines = []
