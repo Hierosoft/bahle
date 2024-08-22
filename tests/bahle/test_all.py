@@ -510,6 +510,22 @@ def test_literal_to_expression_inequalities(capsys, interpreter, expected_output
     captured = capsys.readouterr()
     assert captured.out == expected_output + '\n'
 
+@pytest.mark.parametrize(
+    'interpreter, expected_output',
+    indirect=['interpreter'],
+    argvalues=(
+        (('a = 11', 'b = 12', 'PRINT 21 > a ; b'), '-1  12 '),
+    )
+)
+def test_inequalities_vs_flush_order(capsys, interpreter, expected_output):
+    captured = capsys.readouterr()
+    assert captured.out == expected_output + '\n'
+
+def test_inequalities_flush_syntax_error(interpreter):
+    with pytest.raises(SyntaxError):
+        for line in ('a = 10', 'b = 11', 'x = 21 > a ; b'):
+            interpreter.interpret(line)
+
 
 @pytest.mark.parametrize(
     'interpreter, expected_output',
